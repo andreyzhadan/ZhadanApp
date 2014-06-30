@@ -1,9 +1,11 @@
-package com.zhadan;
+package com.zhadan.api;
 
 import com.google.api.server.spi.config.Api;
 import com.google.api.server.spi.config.ApiMethod;
 import com.google.api.server.spi.config.ApiMethod.HttpMethod;
 import com.google.api.server.spi.config.Named;
+import com.zhadan.domain.HelloClass;
+import com.zhadan.constants.Constants;
 
 /**
  * Defines endpoint functions APIs.

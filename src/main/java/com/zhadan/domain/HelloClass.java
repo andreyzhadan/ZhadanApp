@@ -1,4 +1,4 @@
-package com.zhadan;
+package com.zhadan.domain;
 
 public class HelloClass {
     public String message = "Hello World";
