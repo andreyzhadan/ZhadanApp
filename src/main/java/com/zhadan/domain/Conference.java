@@ -5,8 +5,11 @@ import com.google.api.server.spi.config.ApiResourceProperty;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.googlecode.objectify.Key;
-import com.googlecode.objectify.annotation.*;
-import com.googlecode.objectify.condition.IfNotDefault;
+import com.googlecode.objectify.annotation.Entity;
+import com.googlecode.objectify.annotation.Id;
+import com.googlecode.objectify.annotation.Index;
+import com.googlecode.objectify.annotation.Parent;
+import com.zhadan.domain.Profile;
 import com.zhadan.form.ConferenceForm;
 
 import java.util.Calendar;
@@ -15,12 +18,11 @@ import java.util.List;
 
 import static com.zhadan.service.OfyService.ofy;
 
+
 /**
- * Created by andrewzhadan on 7/6/14.
  * Conference class stores conference information.
  */
 @Entity
-@Cache
 public class Conference {
 
     private static final String DEFAULT_CITY = "Default City";
@@ -33,7 +35,7 @@ public class Conference {
      * We use automatic id assignment for entities of Conference class.
      */
     @Id
-    private long id;
+    private Long id;
 
     /**
      * The name of the conference.
@@ -54,7 +56,7 @@ public class Conference {
     private Key<Profile> profileKey;
 
     /**
-     * The userId of the organizer.
+     * The gplus_id of the organizer.
      */
     @ApiResourceProperty(ignored = AnnotationBoolean.TRUE)
     private String organizerUserId;
@@ -68,7 +70,7 @@ public class Conference {
     /**
      * The name of the city that the conference takes place.
      */
-    @Index(IfNotDefault.class)
+    @Index
     private String city;
 
     /**
@@ -133,7 +135,6 @@ public class Conference {
         return profileKey;
     }
 
-    // Get a String version of the key
     public String getWebsafeKey() {
         return Key.create(profileKey, Conference.class, id).getString();
     }
@@ -146,11 +147,10 @@ public class Conference {
     /**
      * Returns organizer's display name.
      *
-     * @return organizer's display name. If there is no Profile, return his/her userId.
+     * @return organizer's display name. If there is no Profile, return his/her gplusId.
      */
     public String getOrganizerDisplayName() {
-        // Profile organizer = ofy().load().key(Key.create(Profile.class, organizerUserId)).now();
-        Profile organizer = ofy().load().key(getProfileKey()).now();
+        Profile organizer = ofy().load().key(Key.create(Profile.class, organizerUserId)).now();
         if (organizer == null) {
             return organizerUserId;
         } else {
@@ -273,6 +273,4 @@ public class Conference {
         stringBuilder.append("Max Attendees: ").append(maxAttendees).append("\n");
         return stringBuilder.toString();
     }
-
 }
-

@@ -1,12 +1,16 @@
 import com.google.appengine.tools.development.testing.LocalDatastoreServiceTestConfig;
 import com.google.appengine.tools.development.testing.LocalServiceTestHelper;
+import com.googlecode.objectify.Key;
+import com.zhadan.domain.Conference;
 import com.zhadan.domain.Profile;
+import com.zhadan.form.ProfileForm;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import static com.zhadan.form.ProfileForm.TeeShirtSize;
-import static com.zhadan.form.ProfileForm.TeeShirtSize.M;
+import java.util.ArrayList;
+import java.util.List;
+
 import static junit.framework.Assert.assertEquals;
 
 /**
@@ -14,19 +18,17 @@ import static junit.framework.Assert.assertEquals;
  */
 public class ProfileTest {
 
-    private static final String EMAIL = "example@gmail.com";
+    private static final String EMAIL = "testuser@example.com";
 
     private static final String USER_ID = "123456789";
 
-    private static final TeeShirtSize TEE_SHIRT_SIZE = M;
+    private static final ProfileForm.TeeShirtSize TEE_SHIRT_SIZE = ProfileForm.TeeShirtSize.M;
 
-    private static final String DISPLAY_NAME = "Your Name Here";
-
-    private Profile profile;
-
+    private static final String DISPLAY_NAME = "Test User";
     private final LocalServiceTestHelper helper =
             new LocalServiceTestHelper(new LocalDatastoreServiceTestConfig()
                     .setDefaultHighRepJobPolicyUnappliedJobPercentage(100));
+    private Profile profile;
 
     @Before
     public void setUp() throws Exception {
@@ -49,8 +51,8 @@ public class ProfileTest {
 
     @Test
     public void testUpdate() throws Exception {
-        String newDisplayName = "New Display Name";
-        TeeShirtSize newTeeShirtSize = TeeShirtSize.M;
+        String newDisplayName = "Kay's Daddy";
+        ProfileForm.TeeShirtSize newTeeShirtSize = ProfileForm.TeeShirtSize.M;
         profile.update(newDisplayName, newTeeShirtSize);
         assertEquals(USER_ID, profile.getUserId());
         assertEquals(newDisplayName, profile.getDisplayName());
@@ -58,7 +60,6 @@ public class ProfileTest {
         assertEquals(newTeeShirtSize, profile.getTeeShirtSize());
     }
 
-    /*
     @Test
     public void testListValues() throws Exception {
         List<String> conferenceKeys = new ArrayList<>();
@@ -68,5 +69,4 @@ public class ProfileTest {
         conferenceKeys.add(conferenceKey.getString());
         assertEquals(conferenceKeys, profile.getConferenceKeysToAttend());
     }
-    */
 }
