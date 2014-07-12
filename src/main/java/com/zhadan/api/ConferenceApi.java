@@ -4,10 +4,17 @@ import com.google.api.server.spi.config.Api;
 import com.google.api.server.spi.config.ApiMethod;
 import com.google.api.server.spi.config.ApiMethod.HttpMethod;
 import com.google.api.server.spi.response.UnauthorizedException;
+import com.google.appengine.api.memcache.MemcacheService;
+import com.google.appengine.api.memcache.MemcacheServiceFactory;
+import com.google.appengine.api.taskqueue.Queue;
+import com.google.appengine.api.taskqueue.QueueFactory;
+import com.google.appengine.api.taskqueue.TaskOptions;
 import com.google.appengine.api.users.User;
 import com.googlecode.objectify.Key;
+import com.googlecode.objectify.Work;
 import com.googlecode.objectify.cmd.Query;
 import com.zhadan.constants.Constants;
+import com.zhadan.domain.Announcement;
 import com.zhadan.domain.Conference;
 import com.zhadan.domain.Profile;
 import com.zhadan.form.ConferenceForm;
@@ -148,34 +155,34 @@ public class ConferenceApi {
     @ApiMethod(name = "createConference", path = "conference", httpMethod = HttpMethod.POST)
     public Conference createConference(final User user, final ConferenceForm conferenceForm)
             throws UnauthorizedException {
-
-        // Get the userId of the logged in User
-        String userId = user.getUserId();
-
-        // Get the key for the User's Profile
+        if (user == null) {
+            throw new UnauthorizedException("Authorization required");
+        }
+        // Allocate Id first, in order to make the transaction idempotent.
+        final String userId = user.getUserId();
         Key<Profile> profileKey = Key.create(Profile.class, userId);
-
-        // Allocate a key for the conference -- let App Engine allocate the ID
-        // Don't forget to include the parent Profile in the allocated ID
         final Key<Conference> conferenceKey = factory().allocateId(profileKey, Conference.class);
-
-        // Get the Conference Id from the Key
         final long conferenceId = conferenceKey.getId();
+        final Queue queue = QueueFactory.getDefaultQueue();
 
-        // Get the existing Profile entity for the current user if there is one
-        // Otherwise create a new Profile entity with default values
-        Profile profile = getProfileFromUser(user);
-
-        // Create a new Conference Entity, specifying the user's Profile entity
-        // as the parent of the conference
-        Conference conference = new Conference(conferenceId, userId, conferenceForm);
-
-        // Save Conference and Profile Entities
-        ofy().save().entities(conference, profile).now();
-
+        // Start a transaction.
+        Conference conference = ofy().transact(new Work<Conference>() {
+            @Override
+            public Conference run() {
+                // Fetch user's Profile.
+                Profile profile = getProfileFromUser(user);
+                Conference conference = new Conference(conferenceId, userId, conferenceForm);
+                // Save Conference and Profile.
+                ofy().save().entities(conference, profile).now();
+                queue.add(ofy().getTransaction(),
+                        TaskOptions.Builder.withUrl("/tasks/send_confirmation_email")
+                                .param("email", profile.getMainEmail())
+                                .param("conferenceInfo", conference.toString()));
+                return conference;
+            }
+        });
         return conference;
     }
-
 
     /**
      * Queries against the datastore with the given filters and returns the result.
@@ -235,12 +242,22 @@ public class ConferenceApi {
         query = query.filter("city =", "London");
 
         // Add a filter for topic = "Medical Innovations"
-//        query = query.filter("topics =", "Medical Innovations");
+        // query = query.filter("topics =", "Medical Innovations");
 
         // Add a filter for maxAttendees
-//        query = query.filter("maxAttendees >", 8);
-//        query = query.filter("maxAttendees <", 10).order("maxAttendees").order("name");
+        // query = query.filter("maxAttendees >", 8);
+        // query = query.filter("maxAttendees <", 10).order("maxAttendees").order("name");
 
         return query.list();
+    }
+
+    @ApiMethod(name = "getAnnouncement", path = "announcement", httpMethod = HttpMethod.GET)
+    public Announcement getAnnouncement() {
+        MemcacheService memcacheService = MemcacheServiceFactory.getMemcacheService();
+        Object message = memcacheService.get(Constants.MEMCACHE_ANNOUNCEMENTS_KEY);
+        if (message != null) {
+            return new Announcement(message.toString());
+        }
+        return null;
     }
 }

@@ -19,6 +19,94 @@ import static com.zhadan.service.OfyService.ofy;
 public class ConferenceQueryForm {
 
     private static final Logger LOG = Logger.getLogger(ConferenceQueryForm.class.getName());
+    /**
+     * A list of query filters.
+     */
+    private List<Filter> filters = new ArrayList<>(0);
+    /**
+     * Holds the first inequalityFilter for checking the feasibility of the whole query.
+     */
+    @ApiResourceProperty(ignored = AnnotationBoolean.TRUE)
+    private Filter inequalityFilter;
+
+    public ConferenceQueryForm() {
+    }
+
+    /**
+     * Checks the feasibility of the whole query.
+     */
+    private void checkFilters() {
+        for (Filter filter : this.filters) {
+            if (filter.operator.isInequalityFilter()) {
+                // Only one inequality filter is allowed.
+                if (inequalityFilter != null && !inequalityFilter.field.equals(filter.field)) {
+                    throw new IllegalArgumentException(
+                            "Inequality filter is allowed on only one field.");
+                }
+                inequalityFilter = filter;
+            }
+        }
+    }
+
+    /**
+     * Getter for filters.
+     *
+     * @return The List of filters.
+     */
+    public List<Filter> getFilters() {
+        return ImmutableList.copyOf(filters);
+    }
+
+    /**
+     * Adds a query filter.
+     *
+     * @param filter A Filter object for the query.
+     * @return this for method chaining.
+     */
+    public ConferenceQueryForm filter(Filter filter) {
+        if (filter.operator.isInequalityFilter()) {
+            // Only allows inequality filters on a single field.
+            if (inequalityFilter != null && !inequalityFilter.field.equals(filter.field)) {
+                throw new IllegalArgumentException(
+                        "Inequality filter is allowed on only one field.");
+            }
+            inequalityFilter = filter;
+        }
+        filters.add(filter);
+        return this;
+    }
+
+    /**
+     * Returns an Objectify Query object for the specified filters.
+     *
+     * @return an Objectify Query.
+     */
+    @ApiResourceProperty(ignored = AnnotationBoolean.TRUE)
+    public Query<Conference> getQuery() {
+        // First check the feasibility of inequality filters.
+        checkFilters();
+        Query<Conference> query = ofy().load().type(Conference.class);
+        if (inequalityFilter == null) {
+            // Order by name.
+            query = query.order("name");
+        } else {
+            // If we have any inequality filters, order by the field first.
+            query = query.order(inequalityFilter.field.getFieldName());
+            query = query.order("name");
+        }
+        for (Filter filter : this.filters) {
+            // Applies filters in order.
+            if (filter.field.fieldType == FieldType.STRING) {
+                query = query.filter(String.format("%s %s", filter.field.getFieldName(),
+                        filter.operator.getQueryOperator()), filter.value);
+            } else if (filter.field.fieldType == FieldType.INTEGER) {
+                query = query.filter(String.format("%s %s", filter.field.getFieldName(),
+                        filter.operator.getQueryOperator()), Integer.parseInt(filter.value));
+            }
+        }
+        LOG.info(query.toString());
+        return query;
+    }
 
     /**
      * Enum representing a field type.
@@ -105,95 +193,5 @@ public class ConferenceQueryForm {
         public String getValue() {
             return value;
         }
-    }
-
-    /**
-     * A list of query filters.
-     */
-    private List<Filter> filters = new ArrayList<>(0);
-
-    /**
-     * Holds the first inequalityFilter for checking the feasibility of the whole query.
-     */
-    @ApiResourceProperty(ignored = AnnotationBoolean.TRUE)
-    private Filter inequalityFilter;
-
-    public ConferenceQueryForm() {
-    }
-
-    /**
-     * Checks the feasibility of the whole query.
-     */
-    private void checkFilters() {
-        for (Filter filter : this.filters) {
-            if (filter.operator.isInequalityFilter()) {
-                // Only one inequality filter is allowed.
-                if (inequalityFilter != null && !inequalityFilter.field.equals(filter.field)) {
-                    throw new IllegalArgumentException(
-                            "Inequality filter is allowed on only one field.");
-                }
-                inequalityFilter = filter;
-            }
-        }
-    }
-
-    /**
-     * Getter for filters.
-     *
-     * @return The List of filters.
-     */
-    public List<Filter> getFilters() {
-        return ImmutableList.copyOf(filters);
-    }
-
-    /**
-     * Adds a query filter.
-     *
-     * @param filter A Filter object for the query.
-     * @return this for method chaining.
-     */
-    public ConferenceQueryForm filter(Filter filter) {
-        if (filter.operator.isInequalityFilter()) {
-            // Only allows inequality filters on a single field.
-            if (inequalityFilter != null && !inequalityFilter.field.equals(filter.field)) {
-                throw new IllegalArgumentException(
-                        "Inequality filter is allowed on only one field.");
-            }
-            inequalityFilter = filter;
-        }
-        filters.add(filter);
-        return this;
-    }
-
-    /**
-     * Returns an Objectify Query object for the specified filters.
-     *
-     * @return an Objectify Query.
-     */
-    @ApiResourceProperty(ignored = AnnotationBoolean.TRUE)
-    public Query<Conference> getQuery() {
-        // First check the feasibility of inequality filters.
-        checkFilters();
-        Query<Conference> query = ofy().load().type(Conference.class);
-        if (inequalityFilter == null) {
-            // Order by name.
-            query = query.order("name");
-        } else {
-            // If we have any inequality filters, order by the field first.
-            query = query.order(inequalityFilter.field.getFieldName());
-            query = query.order("name");
-        }
-        for (Filter filter : this.filters) {
-            // Applies filters in order.
-            if (filter.field.fieldType == FieldType.STRING) {
-                query = query.filter(String.format("%s %s", filter.field.getFieldName(),
-                        filter.operator.getQueryOperator()), filter.value);
-            } else if (filter.field.fieldType == FieldType.INTEGER) {
-                query = query.filter(String.format("%s %s", filter.field.getFieldName(),
-                        filter.operator.getQueryOperator()), Integer.parseInt(filter.value));
-            }
-        }
-        LOG.info(query.toString());
-        return query;
     }
 }
