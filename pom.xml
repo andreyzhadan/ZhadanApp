@@ -42,12 +42,6 @@
             <artifactId>objectify</artifactId>
             <version>5.0</version>
         </dependency>
-        <!-- Translate API -->
-        <dependency>
-            <groupId>com.google.apis</groupId>
-            <artifactId>google-api-services-translate</artifactId>
-            <version>v2-rev33-1.18.0-rc</version>
-        </dependency>
 
         <!-- Test Dependencies -->
         <dependency>

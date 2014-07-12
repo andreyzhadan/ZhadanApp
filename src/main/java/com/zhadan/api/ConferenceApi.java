@@ -6,12 +6,21 @@ import com.google.api.server.spi.config.ApiMethod.HttpMethod;
 import com.google.api.server.spi.response.UnauthorizedException;
 import com.google.appengine.api.users.User;
 import com.googlecode.objectify.Key;
+import com.googlecode.objectify.cmd.Query;
 import com.zhadan.constants.Constants;
+import com.zhadan.domain.Conference;
 import com.zhadan.domain.Profile;
+import com.zhadan.form.ConferenceForm;
+import com.zhadan.form.ConferenceQueryForm;
 import com.zhadan.form.ProfileForm;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static com.zhadan.constants.Constants.API_EXPLORER_CLIENT_ID;
 import static com.zhadan.form.ProfileForm.TeeShirtSize;
+import static com.zhadan.service.OfyService.factory;
+import static com.zhadan.service.OfyService.ofy;
 
 /**
  * Defines conference APIs.
@@ -23,9 +32,30 @@ public class ConferenceApi {
     /*
      * Get the display name from the user's email. For example, if the email is
      * lemoncake@example.com, then the display name becomes "lemoncake."
-     */
+    */
     private static String extractDefaultDisplayNameFromEmail(String email) {
         return email == null ? null : email.substring(0, email.indexOf("@"));
+    }
+
+    /**
+     * Gets the Profile entity for the current user
+     * or creates it if it doesn't exist
+     *
+     * @param user
+     * @return user's Profile
+     */
+    private static Profile getProfileFromUser(User user) {
+        // First fetch the user's Profile from the datastore.
+        Profile profile = ofy().load().key(
+                Key.create(Profile.class, user.getUserId())).now();
+        if (profile == null) {
+            // Create a new Profile if it doesn't exist.
+            // Use default displayName and teeShirtSize
+            String email = user.getEmail();
+            profile = new Profile(user.getUserId(),
+                    extractDefaultDisplayNameFromEmail(email), email, TeeShirtSize.NOT_SPECIFIED);
+        }
+        return profile;
     }
 
     /**
@@ -37,7 +67,6 @@ public class ConferenceApi {
      * @return Profile object just created.
      * @throws UnauthorizedException when the User object is null.
      */
-
     // Declare this method as a method available externally through Endpoints
     @ApiMethod(name = "saveProfile", path = "profile", httpMethod = HttpMethod.POST)
     // The request that invokes this method should provide data that
@@ -53,6 +82,10 @@ public class ConferenceApi {
             throw new UnauthorizedException("Authorization required");
         }
 
+        // Get the userId and mainEmail
+        userId = user.getUserId();
+        mainEmail = user.getEmail();
+
         // Set the teeShirtSize to the value sent by the ProfileForm, if sent
         // otherwise leave it as the default value
         if (profileForm.getTeeShirtSize() != null) {
@@ -63,22 +96,21 @@ public class ConferenceApi {
         // otherwise set it to null
         displayName = profileForm.getDisplayName();
 
-        // Get the userId and mainEmail
-        userId = user.getUserId();
-        mainEmail = user.getEmail();
-
-        // If the displayName is null, set it to default value based on the user's email
-        // by calling extractDefaultDisplayNameFromEmail(...)
-        if (displayName == null) {
-            displayName = extractDefaultDisplayNameFromEmail(mainEmail);
+        // Get the profile from the DataStore,
+        // if exists - update, else - create new
+        Profile profile = ofy().load().key(Key.create(Profile.class, userId)).now();
+        if (profile == null) {
+            // If the displayName is null, set it to default value based on the user's email
+            // by calling extractDefaultDisplayNameFromEmail(...)
+            if (displayName == null) {
+                displayName = extractDefaultDisplayNameFromEmail(mainEmail);
+            }
+            profile = new Profile(userId, displayName, mainEmail, teeShirtSize);
+        } else {
+            profile.update(displayName, teeShirtSize);
         }
-
-        // Create a new Profile entity from the
-        // userId, displayName, mainEmail and teeShirtSize
-        Profile profile = new Profile(userId, displayName, mainEmail, teeShirtSize);
-
-        // TODO 3 (In Lesson 3)
         // Save the Profile entity in the datastore
+        ofy().save().entity(profile).now();
 
         // Return the profile
         return profile;
@@ -98,11 +130,117 @@ public class ConferenceApi {
             throw new UnauthorizedException("Authorization required");
         }
 
-        // TODO
         // load the Profile Entity
-        String userId = ""; // TODO
-        Key key = null; // TODO
-        Profile profile = null; // TODO load the Profile entity
+        String userId = user.getUserId();
+        Key key = Key.create(Profile.class, userId);
+        Profile profile = (Profile) ofy().load().key(key).now();
         return profile;
+    }
+
+    /**
+     * Creates a new Conference object and stores it to the datastore.
+     *
+     * @param user           A user who invokes this method, null when the user is not signed in.
+     * @param conferenceForm A ConferenceForm object representing user's inputs.
+     * @return A newly created Conference Object.
+     * @throws UnauthorizedException when the user is not signed in.
+     */
+    @ApiMethod(name = "createConference", path = "conference", httpMethod = HttpMethod.POST)
+    public Conference createConference(final User user, final ConferenceForm conferenceForm)
+            throws UnauthorizedException {
+
+        // Get the userId of the logged in User
+        String userId = user.getUserId();
+
+        // Get the key for the User's Profile
+        Key<Profile> profileKey = Key.create(Profile.class, userId);
+
+        // Allocate a key for the conference -- let App Engine allocate the ID
+        // Don't forget to include the parent Profile in the allocated ID
+        final Key<Conference> conferenceKey = factory().allocateId(profileKey, Conference.class);
+
+        // Get the Conference Id from the Key
+        final long conferenceId = conferenceKey.getId();
+
+        // Get the existing Profile entity for the current user if there is one
+        // Otherwise create a new Profile entity with default values
+        Profile profile = getProfileFromUser(user);
+
+        // Create a new Conference Entity, specifying the user's Profile entity
+        // as the parent of the conference
+        Conference conference = new Conference(conferenceId, userId, conferenceForm);
+
+        // Save Conference and Profile Entities
+        ofy().save().entities(conference, profile).now();
+
+        return conference;
+    }
+
+
+    /**
+     * Queries against the datastore with the given filters and returns the result.
+     * <p/>
+     * Normally this kind of method is supposed to get invoked by a GET HTTP method,
+     * but we do it with POST, in order to receive conferenceQueryForm Object via the POST body.
+     *
+     * @param conferenceQueryForm A form object representing the query.
+     * @return A List of Conferences that match the query.
+     */
+    @ApiMethod(name = "queryConferences",
+            path = "queryConferences",
+            httpMethod = HttpMethod.POST)
+    public List<Conference> queryConferences(ConferenceQueryForm conferenceQueryForm) {
+        Iterable<Conference> conferenceIterable = conferenceQueryForm.getQuery();
+        List<Conference> result = new ArrayList<>(0);
+        List<Key<Profile>> organizersKeyList = new ArrayList<>(0);
+        for (Conference conference : conferenceIterable) {
+            organizersKeyList.add(Key.create(Profile.class, conference.getOrganizerUserId()));
+            result.add(conference);
+        }
+        // To avoid separate datastore gets for each Conference, pre-fetch the Profiles.
+        ofy().load().keys(organizersKeyList);
+        return result;
+    }
+
+    /**
+     * Returns a list of Conferences that the user created.
+     * In order to receive the websafeConferenceKey via the JSON params, uses a POST method.
+     *
+     * @param user A user who invokes this method, null when the user is not signed in.
+     * @return a list of Conferences that the user created.
+     * @throws UnauthorizedException when the user is not signed in.
+     */
+    @ApiMethod(
+            name = "getConferencesCreated",
+            path = "getConferencesCreated",
+            httpMethod = HttpMethod.POST
+    )
+    public List<Conference> getConferencesCreated(final User user) throws UnauthorizedException {
+        // If not signed in, throw a 401 error.
+        if (user == null) {
+            throw new UnauthorizedException("Authorization required");
+        }
+        String userId = user.getUserId();
+        Key<Profile> userKey = Key.create(Profile.class, userId);
+        return ofy().load().type(Conference.class)
+                .ancestor(userKey)
+                .order("name").list();
+    }
+
+
+    public List<Conference> filterPlayground() {
+        Query<Conference> query = ofy().load().type(Conference.class);
+
+        // Filter on city
+        query = query.filter("city =", "London");
+
+        // Add a filter for topic = "Medical Innovations"
+//        query = query.filter("topics =", "Medical Innovations");
+
+        // Add a filter for maxAttendees
+//        query = query.filter("maxAttendees >", 8);
+//        query = query.filter("maxAttendees <", 10).order("maxAttendees").order("name");
+
+        return query.list();
     }
 }

@@ -1,19 +1,31 @@
 package com.zhadan.domain;
 
+import com.google.common.collect.ImmutableList;
+import com.googlecode.objectify.annotation.Cache;
+import com.googlecode.objectify.annotation.Entity;
+import com.googlecode.objectify.annotation.Id;
+
+import java.util.ArrayList;
+import java.util.List;
+
 import static com.zhadan.form.ProfileForm.TeeShirtSize;
 
 /**
  * Created by andrewzhadan on 6/30/14.
  */
 
-// TODO indicate that this class is an Entity
+@Entity
+@Cache
 public class Profile {
-    String displayName;
-    String mainEmail;
-    TeeShirtSize teeShirtSize;
+    private String displayName;
+    private String mainEmail;
+    private TeeShirtSize teeShirtSize;
 
-    // TODO indicate that the userId is to be used in the Entity's key
-    String userId;
+    @Id
+    private String userId;
+
+    // List of conferences the user has registered to attend
+    private List<String> conferenceKeysToAttend = new ArrayList<>(0);
 
     /**
      * Public constructor for Profile.
@@ -28,6 +40,12 @@ public class Profile {
         this.displayName = displayName;
         this.mainEmail = mainEmail;
         this.teeShirtSize = teeShirtSize;
+    }
+
+    /**
+     * Just making the default constructor private.
+     */
+    private Profile() {
     }
 
     public String getDisplayName() {
@@ -46,10 +64,34 @@ public class Profile {
         return userId;
     }
 
+    public List<String> getConferenceKeysToAttend() {
+        return ImmutableList.copyOf(conferenceKeysToAttend);
+    }
+
+    public void addToConferenceKeysToAttend(String conferenceKey) {
+        conferenceKeysToAttend.add(conferenceKey);
+    }
+
+    public void update(String displayName, TeeShirtSize teeShirtSize) {
+        if (displayName != null) {
+            this.displayName = displayName;
+        }
+        if (teeShirtSize != null) {
+            this.teeShirtSize = teeShirtSize;
+        }
+    }
+
     /**
-     * Just making the default constructor private.
+     * Remove the conferenceId from conferenceIdsToAttend.
+     *
+     * @param conferenceKey a websafe String representation of the Conference Key.
      */
-    private Profile() {
+    public void unregisterFromConference(String conferenceKey) {
+        if (conferenceKeysToAttend.contains(conferenceKey)) {
+            conferenceKeysToAttend.remove(conferenceKey);
+        } else {
+            throw new IllegalArgumentException("Invalid conferenceKey: " + conferenceKey);
+        }
     }
 
 }

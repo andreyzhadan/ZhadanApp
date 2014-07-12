@@ -3,6 +3,7 @@ package com.zhadan.service;
 import com.googlecode.objectify.Objectify;
 import com.googlecode.objectify.ObjectifyFactory;
 import com.googlecode.objectify.ObjectifyService;
+import com.zhadan.domain.Conference;
 import com.zhadan.domain.Profile;
 
 /**
@@ -14,6 +15,7 @@ public class OfyService {
      */
     static {
         factory().register(Profile.class);
+        factory().register(Conference.class);
     }
 
     /**

@@ -12,7 +12,7 @@
  *
  */
 var app = angular.module('conferenceApp',
-    ['conferenceControllers', 'ngRoute', 'ui.bootstrap']).
+        ['conferenceControllers', 'ngRoute', 'ui.bootstrap']).
     config(['$routeProvider',
         function ($routeProvider) {
             $routeProvider.
@@ -86,7 +86,7 @@ app.constant('HTTP_ERRORS', {
  */
 app.factory('oauth2Provider', function ($modal) {
     var oauth2Provider = {
-        CLIENT_ID: 'replace with your client id',
+        CLIENT_ID: '1086568158234-5na1o1n7quctg976k48fb45hj3022bpi.apps.googleusercontent.com',
         SCOPES: 'https://www.googleapis.com/auth/userinfo.email profile',
         signedIn: false
     };
