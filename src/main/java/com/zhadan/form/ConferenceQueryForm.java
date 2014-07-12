@@ -1,5 +1,6 @@
 package com.zhadan.form;
 
+
 import com.google.api.server.spi.config.AnnotationBoolean;
 import com.google.api.server.spi.config.ApiResourceProperty;
 import com.google.common.collect.ImmutableList;
@@ -11,7 +12,6 @@ import java.util.List;
 import java.util.logging.Logger;
 
 import static com.zhadan.service.OfyService.ofy;
-
 
 /**
  * A simple Java object (POJO) representing a query options for Conference.

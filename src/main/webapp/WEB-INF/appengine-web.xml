@@ -3,4 +3,8 @@
     <application>a-zhadan</application>
     <version>1</version>
     <threadsafe>true</threadsafe>
+
+    <admin-console>
+        <page name="Appstats" url="/appstats"/>
+    </admin-console>
 </appengine-web-app>
